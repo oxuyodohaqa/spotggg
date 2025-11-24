@@ -30,6 +30,7 @@ const GMAIL_USER = process.env.GMAIL_USER;
 const GMAIL_IMAP_DOMAINS = {
   'multi': '@puella.shop,@dressrosa.me,@dressrosa.biz.id,@levisama.my.id,@shanesama.my.id,@natsusensei.my.id,@rachelkun.my.id,@rachelkun.biz.id,@erenkun.my.id,@erenkun.biz.id,@erenkun.web.id,@kirsheebie.my.id',
   'admin': '@deiyn.xyz,@deiyn.shop',
+  'spotshee': '@akuma.web.id,@natsusensei.my.id',
   'paypal': GMAIL_USER ? '@' + GMAIL_USER.split('@')[1] : '@gmail.com'
 };
 
@@ -43,6 +44,7 @@ const CURRENT_GMAIL_DOMAINS = GMAIL_IMAP_DOMAINS[BOT_TYPE]
 const BOT_GMAIL_DOMAINS = {
   'multi': '',
   'admin': '',
+  'spotshee': 'akuma.web.id',
   'paypal': GMAIL_USER ? GMAIL_USER.split('@')[1] : 'gmail.com'
 };
 
@@ -509,7 +511,22 @@ const SPOTIFY_DOMAINS = {
     'erenkun.my.id',
     'erenkun.biz.id',
     'erenkun.web.id',
-    'kirsheebie.my.id'
+    'kirsheebie.my.id',
+    'deku.biz.id',
+    'deku.my.id',
+    'frank.my.id',
+    'doeiya.my.id',
+    'dawn189.web.id',
+    'david487.my.id',
+    'collyland.my.id',
+    'christina.web.id',
+    'byakuya.my.id',
+    'yuki.web.id',
+    'byakuya.web.id'
+  ],
+  'spotshee': [
+    'akuma.web.id',
+    'natsusensei.my.id'
   ],
   'admin': ['deiyn.xyz', 'deiyn.shop'],
   'paypal': ['puella.shop']
@@ -531,7 +548,18 @@ const CANVA_DOMAINS_LIST = {
     'rachelkun.biz.id',
     'erenkun.my.id',
     'erenkun.biz.id',
-    'erenkun.web.id'
+    'erenkun.web.id',
+    'deku.biz.id',
+    'deku.my.id',
+    'frank.my.id',
+    'doeiya.my.id',
+    'dawn189.web.id',
+    'david487.my.id',
+    'collyland.my.id',
+    'christina.web.id',
+    'byakuya.my.id',
+    'yuki.web.id',
+    'byakuya.web.id'
   ],
   'admin': ['deiyn.xyz', 'deiyn.shop'],
   'paypal': ['canvaotpbot.shop']
@@ -1257,6 +1285,19 @@ function getMainKeyboard(userId) {
       reply_markup: {
         inline_keyboard: [
           [{ text: '💳 Get PayPal OTP', callback_data: 'service_paypal' }],
+          [{ text: '📊 Stats', callback_data: 'stats' }, { text: '📜 History', callback_data: 'history' }],
+          [{ text: '❓ Help', callback_data: 'help' }],
+          [{ text: '💬 Message Admin', callback_data: 'message_admin' }]
+        ]
+      }
+    };
+  }
+
+  if (BOT_TYPE === 'spotshee') {
+    return {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🎵 Spotify', callback_data: 'service_spotify' }],
           [{ text: '📊 Stats', callback_data: 'stats' }, { text: '📜 History', callback_data: 'history' }],
           [{ text: '❓ Help', callback_data: 'help' }],
           [{ text: '💬 Message Admin', callback_data: 'message_admin' }]
