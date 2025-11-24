@@ -509,7 +509,18 @@ const SPOTIFY_DOMAINS = {
     'erenkun.my.id',
     'erenkun.biz.id',
     'erenkun.web.id',
-    'kirsheebie.my.id'
+    'kirsheebie.my.id',
+    'deku.biz.id',
+    'deku.my.id',
+    'frank.my.id',
+    'doeiya.my.id',
+    'dawn189.web.id',
+    'david487.my.id',
+    'collyland.my.id',
+    'christina.web.id',
+    'byakuya.my.id',
+    'yuki.web.id',
+    'byakuya.web.id'
   ],
   'admin': ['deiyn.xyz', 'deiyn.shop'],
   'paypal': ['puella.shop']
@@ -531,7 +542,18 @@ const CANVA_DOMAINS_LIST = {
     'rachelkun.biz.id',
     'erenkun.my.id',
     'erenkun.biz.id',
-    'erenkun.web.id'
+    'erenkun.web.id',
+    'deku.biz.id',
+    'deku.my.id',
+    'frank.my.id',
+    'doeiya.my.id',
+    'dawn189.web.id',
+    'david487.my.id',
+    'collyland.my.id',
+    'christina.web.id',
+    'byakuya.my.id',
+    'yuki.web.id',
+    'byakuya.web.id'
   ],
   'admin': ['deiyn.xyz', 'deiyn.shop'],
   'paypal': ['canvaotpbot.shop']
