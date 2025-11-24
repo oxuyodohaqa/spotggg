@@ -53,6 +53,24 @@ module.exports = {
       max_restarts: 10,
       min_uptime: '10s',
       restart_delay: 3000
+    },
+    {
+      name: 'gmail-update-bot',
+      script: './bot.js',
+      env: {
+        TELEGRAM_BOT_TOKEN: '8567239369:AAGvEO9_KdR7yDiGhNlyCq4SYYb6AjwyVTY',
+        ADMIN_USER_ID: '7680006005',
+        GMAIL_USER: 'madjgie@gmail.com',
+        GMAIL_APP_PASSWORD: 'Yasmine8001',
+        USERS_FILE: './authorized_users_gmail_update.json',
+        BOT_NAME: 'Gmail Update Bot',
+        BOT_TYPE: 'gmail-update',
+      },
+      watch: false,
+      autorestart: true,
+      max_restarts: 10,
+      min_uptime: '10s',
+      restart_delay: 3000
     }
   ]
 };
