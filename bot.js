@@ -44,7 +44,7 @@ const CURRENT_GMAIL_DOMAINS = GMAIL_IMAP_DOMAINS[BOT_TYPE]
 const BOT_GMAIL_DOMAINS = {
   'multi': '',
   'admin': '',
-  'spotshee': 'akuma.web.id',
+  'spotshee': ['akuma.web.id', 'natsusensei.my.id'],
   'paypal': GMAIL_USER ? GMAIL_USER.split('@')[1] : 'gmail.com'
 };
 
