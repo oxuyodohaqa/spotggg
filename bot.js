@@ -1775,31 +1775,65 @@ function setupHandlers() {
     }
     
     if (data === 'help') {
+      const gmailDomain = CURRENT_GMAIL_DOMAIN || 'gmail.com';
+      const formatDomains = (domains) => domains.map(d => `• ${d}`).join('\n');
+
       let helpText = `❓ HELP / GUIDE\n\n`;
-      
-      helpText += `How to use:\n`;
-      helpText += `1. Select a service\n`;
-      helpText += `2. Enter your email\n`;
-      helpText += `3. Request OTP from service\n`;
-      helpText += `4. Bot fetches code\n\n`;
-      
-      const gmailDomain = CURRENT_GMAIL_DOMAIN;
-      
-      helpText += `Email Domains:\n`;
-      helpText += `✂️ CapCut: temp-mail or generator\n`;
-      helpText += `🎨 Canva: ${CANVA_DOMAINS[0]}, ${gmailDomain}\n`;
-      helpText += `🎵 Spotify: ${SPOTIFY_DOMAIN}\n`;
-      helpText += `📺🧠📚🤖 New services: ${gmailDomain}\n\n`;
-      
+
+      if (BOT_TYPE === 'paypal') {
+        helpText += `🤖 ${BOT_NAME} - PayPal OTP\n\n`;
+        helpText += `Steps:\n`;
+        helpText += `1. Tap "💳 Get PayPal OTP"\n`;
+        helpText += `2. Enter your PayPal email\n`;
+        helpText += `3. Request the PayPal code\n`;
+        helpText += `4. Bot fetches OTP here\n\n`;
+
+        helpText += `Email Options:\n`;
+        helpText += `• Temp-mail / generator email\n`;
+        helpText += `• Gmail (@${gmailDomain})\n\n`;
+      } else if (BOT_TYPE === 'spotshee') {
+        helpText += `🤖 ${BOT_NAME} - Spotify Helper\n\n`;
+        helpText += `Steps:\n`;
+        helpText += `1. Tap "🎵 Spotify"\n`;
+        helpText += `2. Enter your Spotify email\n`;
+        helpText += `3. Request OTP or reset link\n`;
+        helpText += `4. Bot fetches it for you\n\n`;
+
+        helpText += `Allowed Spotify Domains:\n`;
+        helpText += `${formatDomains(CURRENT_SPOTIFY_DOMAINS)}\n\n`;
+      } else if (BOT_TYPE === 'admin') {
+        helpText += `🤖 ${BOT_NAME} - Admin Bot\n\n`;
+        helpText += `Services:\n`;
+        helpText += `🎨 Canva | ✂️ CapCut | 🎵 Spotify | 📚 Scribd\n`;
+        helpText += `🧠 Quizlet | 🤖 Perplexity | 📺 HBO Max | ✍️ Grammarly\n\n`;
+
+        helpText += `Email Domains:\n`;
+        helpText += `• Canva: ${formatDomains(CANVA_DOMAINS)}\n`;
+        helpText += `• Spotify: ${formatDomains(CURRENT_SPOTIFY_DOMAINS)}\n`;
+        helpText += `• Other services: ${gmailDomain}\n\n`;
+      } else {
+        helpText += `🤖 ${BOT_NAME} - Multi Service\n\n`;
+        helpText += `Services:\n`;
+        helpText += `🎨 Canva | ✂️ CapCut | 🎵 Spotify | 📚 Scribd | 🧠 Quizlet | 🤖 Perplexity\n\n`;
+
+        const canvaDomainPreview = CANVA_DOMAINS.slice(0, 3);
+        const spotifyDomainPreview = CURRENT_SPOTIFY_DOMAINS.slice(0, 3);
+
+        helpText += `Email Domains:\n`;
+        helpText += `• Canva: ${formatDomains(canvaDomainPreview)}${CANVA_DOMAINS.length > 3 ? '\n  (+' + (CANVA_DOMAINS.length - 3) + ' more)' : ''}\n`;
+        helpText += `• Spotify: ${formatDomains(spotifyDomainPreview)}${CURRENT_SPOTIFY_DOMAINS.length > 3 ? '\n  (+' + (CURRENT_SPOTIFY_DOMAINS.length - 3) + ' more)' : ''}\n`;
+        helpText += `• Other services: ${gmailDomain}\n\n`;
+      }
+
       helpText += `Features:\n`;
       helpText += `📊 /stats - Your statistics\n`;
       helpText += `📜 /history - Request history\n`;
       helpText += `💬 Message Admin - Contact admin\n\n`;
-      
+
       helpText += `Rate Limits:\n`;
       helpText += `• ${RATE_LIMITS.requests_per_10min} requests per 10 min\n`;
       helpText += `• ${RATE_LIMITS.requests_per_day} requests per day`;
-      
+
       await bot.sendMessage(chatId, helpText);
       return;
     }
