@@ -1,0 +1,58 @@
+module.exports = {
+  apps: [
+    {
+      name: 'paypal-bot',
+      script: './bot.js',
+      env: {
+        TELEGRAM_BOT_TOKEN: '7970481267:AAF4ZAL_-yo9JxotT1X0RR7eNxPjbjm4cF4',
+        ADMIN_USER_ID: '7680006005',
+        GMAIL_USER: 'adeebaab2@gmail.com',
+        GMAIL_APP_PASSWORD: 'awimmgnajhoykrev',
+        USERS_FILE: './authorized_users_bot1.json',
+        BOT_NAME: 'PayPal Bot',
+        BOT_TYPE: 'paypal',
+      },
+      watch: false,
+      autorestart: true,
+      max_restarts: 10,
+      min_uptime: '10s',
+      restart_delay: 3000
+    },
+    {
+      name: 'multi-service-bot',
+      script: './bot.js',
+      env: {
+        TELEGRAM_BOT_TOKEN: '8263062792:AAFhIXNHk5zqea8fq_83Up9FwfA2hGx0Tuk',
+        ADMIN_USER_ID: '7680006005',
+        GMAIL_USER: 'aabkhan402@gmail.com',
+        GMAIL_APP_PASSWORD: 'ftljxjidduzsqxob',
+        USERS_FILE: './authorized_users_bot2.json',
+        BOT_NAME: 'Multi Service Bot',
+        BOT_TYPE: 'multi',
+      },
+      watch: false,
+      autorestart: true,
+      max_restarts: 10,
+      min_uptime: '10s',
+      restart_delay: 3000
+    },
+    {
+      name: 'admin-services-bot',
+      script: './bot.js',
+      env: {
+        TELEGRAM_BOT_TOKEN: '8321440804:AAH5BUXQtSX7TLEEto0ClxF38Ia4iNgUT4U',
+        ADMIN_USER_ID: '7680006005',
+        GMAIL_USER: 'aabkhan402@gmail.com',
+        GMAIL_APP_PASSWORD: 'ftljxjidduzsqxob',
+        USERS_FILE: './authorized_users_admin.json',
+        BOT_NAME: 'Admin Services Bot',
+        BOT_TYPE: 'admin',
+      },
+      watch: false,
+      autorestart: true,
+      max_restarts: 10,
+      min_uptime: '10s',
+      restart_delay: 3000
+    }
+  ]
+};
