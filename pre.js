@@ -1175,7 +1175,41 @@ class VerificationSession {
         console.log(`[${this.id}] ⏰ [${this.countryConfig.flag}] Status check TIMEOUT after ${maxWaitTime} seconds`);
         return { status: 'TIMEOUT', waitTime: maxWaitTime };
     }
-    
+
+    async visitSsoRedirect() {
+        if (!this.verificationId) return { success: false, reason: 'No verification ID' };
+
+        const endpoints = [
+            this.countryConfig.redirectEndpoint.replace('{verificationId}', this.verificationId),
+            `https://services.sheerid.com/redirect/${this.verificationId}`
+        ];
+
+        for (const endpoint of endpoints) {
+            try {
+                const response = await this.client.get(endpoint, {
+                    maxRedirects: 0,
+                    validateStatus: (status) => status >= 200 && status < 400
+                });
+
+                const redirectUrl = response.headers.location || response.data?.redirectUrl;
+                if (redirectUrl) {
+                    console.log(`[${this.id}] 🔗 [${this.countryConfig.flag}] SSO redirect opened: ${redirectUrl}`);
+                    return { success: true, redirectUrl };
+                }
+            } catch (error) {
+                if (error.response?.headers?.location) {
+                    const redirectUrl = error.response.headers.location;
+                    console.log(`[${this.id}] 🔗 [${this.countryConfig.flag}] SSO redirect opened via error path: ${redirectUrl}`);
+                    return { success: true, redirectUrl };
+                }
+
+                console.log(`[${this.id}] ⚠️ [${this.countryConfig.flag}] Failed to open SSO redirect (${endpoint}): ${error.message}`);
+            }
+        }
+
+        return { success: false, reason: 'No redirect available' };
+    }
+
     async getSpotifyUrl() {
         if (!this.verificationId) return null;
         
@@ -1444,6 +1478,16 @@ async function processStudent(student, sessionId, collegeMatcher, deleteManager,
         
         const isSsoFlow = (stepResult === 'sso');
         const shouldAttemptUpload = (stepResult === 'docUpload' || isSsoFlow);
+
+        if (isSsoFlow) {
+            const redirectResult = await session.visitSsoRedirect();
+            if (redirectResult.success) {
+                statsTracker.successTypes.sso_redirect++;
+                console.log(`[${sessionId}] 🔗 [${countryConfig.flag}] SSO redirect visited before upload`);
+            } else {
+                console.log(`[${sessionId}] ⚠️ [${countryConfig.flag}] Could not open SSO redirect before upload: ${redirectResult.reason}`);
+            }
+        }
 
         if (!shouldAttemptUpload) {
             console.log(`[${sessionId}] ❌ [${countryConfig.flag}] Cannot proceed - step: ${stepResult}`);
