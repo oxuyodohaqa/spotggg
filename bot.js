@@ -76,6 +76,34 @@ const TEMP_MAIL_DOMAINS = [
 ];
 
 // ════════════════════════════════════════════════════════════
+// PLAN LISTINGS (Produktifitias AI)
+// ════════════════════════════════════════════════════════════
+
+const PRODUCTIVITY_PLAN_HEADER = 'Selasa, 25 November 2025 19:49:47\n\nProduktifitias AI';
+
+const PRODUCTIVITY_PLANS = [
+  { name: 'Sharing 8 User', price: 'Rp 15.000', duration: '1 Bulan', stock: '0 Akun' },
+  { name: 'Sharing 5 User', price: 'Rp 20.000', duration: '1 Bulan', stock: '0 Akun' },
+  { name: 'PRIVATE', price: 'Rp 80.000', duration: '1 BULAN', stock: '0 Akun' },
+  { name: 'Go Plan (GPT 5K - NW Only)', price: 'Rp 5.000', duration: '1 Bulan', stock: '0 Akun' },
+  { name: 'Plus Plan', price: 'Rp 80.000 (FW) / Rp 40.000 (NW)', duration: '1 Bulan', stock: '0 Akun' },
+  { name: 'CHATGPT PLUS', price: 'Rp -', duration: '1 Bulan', stock: '0 Akun' }
+];
+
+function buildPlanText() {
+  let text = `${PRODUCTIVITY_PLAN_HEADER}\n\n`;
+
+  PRODUCTIVITY_PLANS.forEach((plan) => {
+    text += `${plan.name}\n`;
+    text += `${plan.price}\n`;
+    text += `Durasi: ${plan.duration}\n`;
+    text += `Stok: ${plan.stock}\n\n`;
+  });
+
+  return text.trim();
+}
+
+// ════════════════════════════════════════════════════════════
 // EMAIL GENERATOR SUPPORT (generator.email API)
 // Supports ANY domain that generator.email has
 // ════════════════════════════════════════════════════════════
@@ -1284,6 +1312,7 @@ function getMainKeyboard(userId) {
         inline_keyboard: [
           [{ text: '💳 Get PayPal OTP', callback_data: 'service_paypal' }],
           [{ text: '📊 Stats', callback_data: 'stats' }, { text: '📜 History', callback_data: 'history' }],
+          [{ text: '🛒 Plans', callback_data: 'plans' }],
           [{ text: '❓ Help', callback_data: 'help' }],
           [{ text: '💬 Message Admin', callback_data: 'message_admin' }]
         ]
@@ -1297,6 +1326,7 @@ function getMainKeyboard(userId) {
         inline_keyboard: [
           [{ text: '🎵 Spotify', callback_data: 'service_spotify' }],
           [{ text: '📊 Stats', callback_data: 'stats' }, { text: '📜 History', callback_data: 'history' }],
+          [{ text: '🛒 Plans', callback_data: 'plans' }],
           [{ text: '❓ Help', callback_data: 'help' }],
           [{ text: '💬 Message Admin', callback_data: 'message_admin' }]
         ]
@@ -1320,6 +1350,7 @@ function getMainKeyboard(userId) {
           [{ text: '✍️ Grammarly (Admin)', callback_data: 'service_grammarly' }]
         ] : []),
         [{ text: '📊 Stats', callback_data: 'stats' }, { text: '📜 History', callback_data: 'history' }],
+        [{ text: '🛒 Plans', callback_data: 'plans' }],
         [{ text: '❓ Help', callback_data: 'help' }],
         [{ text: '💬 Message Admin', callback_data: 'message_admin' }]
       ]
@@ -1744,11 +1775,11 @@ function setupHandlers() {
     
     if (data === 'history') {
       const user = authorizedUsers[userId];
-      
+
       if (!user.requestHistory || user.requestHistory.length === 0) {
         return bot.sendMessage(chatId, `📜 No history yet.`);
       }
-      
+
       let historyText = `📜 HISTORY\n\n`;
       
       const serviceEmojis = { 
@@ -1769,11 +1800,25 @@ function setupHandlers() {
         historyText += `${index + 1}. ${emoji} ${req.service} ${status} (${req.timeTaken || 0}s)\n`;
         historyText += `   ${time}\n\n`;
       });
-      
+
       await bot.sendMessage(chatId, historyText);
       return;
     }
-    
+
+    if (data === 'plans') {
+      const planText = buildPlanText();
+
+      await bot.sendMessage(chatId, planText, {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '🏠 Menu', callback_data: 'main_menu' }]
+          ]
+        }
+      });
+
+      return;
+    }
+
     if (data === 'help') {
       const gmailDomain = CURRENT_GMAIL_DOMAIN || 'gmail.com';
       const formatDomains = (domains) => domains.map(d => `• ${d}`).join('\n');
