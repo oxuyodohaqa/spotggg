@@ -512,7 +512,8 @@ class StatisticsTracker {
             instant_exact: 0,
             already_success_exact: 0,
             upload_exact: 0,
-            upload_sso: 0
+            upload_sso: 0,
+            sso_redirect: 0
         };
         
         this.collegeStats = new Map();
@@ -1441,9 +1442,9 @@ async function processStudent(student, sessionId, collegeMatcher, deleteManager,
             return null;
         }
         
-        // ✅ FIXED: Handle both docUpload AND SSO for upload attempts
-        const shouldAttemptUpload = (stepResult === 'docUpload' || stepResult === 'sso');
-        
+        const isSsoFlow = (stepResult === 'sso');
+        const shouldAttemptUpload = (stepResult === 'docUpload' || isSsoFlow);
+
         if (!shouldAttemptUpload) {
             console.log(`[${sessionId}] ❌ [${countryConfig.flag}] Cannot proceed - step: ${stepResult}`);
             deleteManager.markStudentFailed(student.studentId);
@@ -1451,11 +1452,7 @@ async function processStudent(student, sessionId, collegeMatcher, deleteManager,
             statsTracker.recordCollegeAttempt(college.id, college.name, false);
             return null;
         }
-        
-        if (stepResult === 'sso') {
-            console.log(`[${sessionId}] 🔐 [${countryConfig.flag}] SSO COLLEGE detected - Will attempt document upload`);
-        }
-        
+
         // STEP 5: Find all student files
         const files = findStudentFiles(student.studentId);
         if (files.length === 0) {
@@ -1466,43 +1463,43 @@ async function processStudent(student, sessionId, collegeMatcher, deleteManager,
             statsTracker.recordCollegeAttempt(college.id, college.name, false);
             return null;
         }
-        
-        console.log(`[${sessionId}] 📁 [${countryConfig.flag}] Found ${files.length} file(s) for upload`);
-        
+
+        console.log(`[${sessionId}] 📁 [${countryConfig.flag}] Found ${files.length} file(s) for upload${isSsoFlow ? ' (forcing upload for SSO)' : ''}`);
+
         // STEP 6: Try uploading ALL files until success
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
             const attemptNumber = i + 1;
-            
+
             console.log(`[${sessionId}] 📤 [${countryConfig.flag}] Attempting upload ${attemptNumber}/${files.length}: ${file.name}`);
-            
+
             const uploadResult = await session.uploadDocument(file.path, attemptNumber);
-            
+
             if (uploadResult.success) {
                 console.log(`[${sessionId}] ✅ [${countryConfig.flag}] Upload ${attemptNumber} successful! Waiting ${CONFIG.verificationTimeout}s for verification...`);
                 collegeMatcher.incrementUploadRetry();
-                
+
                 // Wait for verification status
                 const statusResult = await session.checkStatus(CONFIG.verificationTimeout);
-                
+
                 // ✅ FIXED: Handle SSO success properly
                 if (statusResult.status === 'SUCCESS' || statusResult.status === 'SSO') {
                     const successType = statusResult.status === 'SSO' ? 'upload_sso' : 'upload_exact';
                     console.log(`[${sessionId}] 🎉 [${countryConfig.flag}] Verification ${statusResult.status} after upload ${attemptNumber}!`);
                     const spotifyUrl = await session.getSpotifyUrl();
-                    
+
                     if (spotifyUrl) {
-                        const result = { 
-                            student, 
-                            url: spotifyUrl, 
-                            type: successType, 
+                        const result = {
+                            student,
+                            url: spotifyUrl,
+                            type: successType,
                             college: college.name,
                             fileUsed: file.name,
                             uploadAttempt: attemptNumber,
                             waitTime: statusResult.waitTime,
-                            ssoForced: (statusResult.status === 'SSO')
+                            ssoForced: (statusResult.status === 'SSO') || isSsoFlow
                         };
-                        saveSpotifyUrl(student, spotifyUrl, session.verificationId, countryConfig, session.getUploadStats(), (statusResult.status === 'SSO'));
+                        saveSpotifyUrl(student, spotifyUrl, session.verificationId, countryConfig, session.getUploadStats(), (statusResult.status === 'SSO') || isSsoFlow);
                         deleteManager.markStudentSuccess(student.studentId);
                         collegeMatcher.addSuccess();
                         statsTracker.recordSuccess(result);
@@ -1518,14 +1515,14 @@ async function processStudent(student, sessionId, collegeMatcher, deleteManager,
                     collegeMatcher.incrementUploadRetry();
                     continue;
                 }
-                
+
             } else {
                 console.log(`[${sessionId}] ❌ [${countryConfig.flag}] Upload ${attemptNumber} failed: ${uploadResult.reason} - trying next file...`);
                 collegeMatcher.incrementUploadRetry();
                 continue;
             }
         }
-        
+
         // STEP 7: All uploads exhausted
         console.log(`[${sessionId}] ❌ [${countryConfig.flag}] All ${files.length} file(s) exhausted`);
         deleteManager.markStudentRejected(student.studentId);
@@ -1689,6 +1686,10 @@ function displayDetailedAnalysis(analysis, countryConfig, matcherStats) {
         if (successTypes.upload_sso > 0) {
             const pct = ((successTypes.upload_sso / total) * 100).toFixed(1);
             console.log(chalk.blue(`🔐 SSO Upload Success: ${successTypes.upload_sso} (${pct}%)`));
+        }
+        if (successTypes.sso_redirect > 0) {
+            const pct = ((successTypes.sso_redirect / total) * 100).toFixed(1);
+            console.log(chalk.blue(`🔗 SSO Redirect Success: ${successTypes.sso_redirect} (${pct}%)`));
         }
     }
     
