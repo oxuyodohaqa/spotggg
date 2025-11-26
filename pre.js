@@ -7,11 +7,9 @@ const { wrapper } = require('axios-cookiejar-support');
 const chalk = require('chalk');
 const readline = require('readline');
 
-// DEFAULT SHEERID OVERRIDES (GEMINI CAMPAIGN)
-const DEFAULT_PROGRAM_OVERRIDE = {
-    programId: '67c8c14f5f17a83b745e3f82',
-    baseOrigin: 'https://services.sheerid.com'
-};
+// DEFAULT SHEERID OVERRIDES
+// (Leave null so overrides only apply when the user provides a link/ID)
+const DEFAULT_PROGRAM_OVERRIDE = null;
 
 // CONFIGURATION
 const CONFIG = {
@@ -500,6 +498,77 @@ function askQuestion(query) {
             resolve(answer);
         });
     });
+}
+
+// PROGRAM ID OVERRIDE HELPERS
+function parseProgramInput(input) {
+    if (!input || !input.trim()) return null;
+
+    const trimmed = input.trim();
+
+    try {
+        const url = new URL(trimmed);
+        const parts = url.pathname.split('/').filter(Boolean);
+        const verifyIndex = parts.indexOf('verify');
+        const programIdFromPath = verifyIndex !== -1 && parts[verifyIndex + 1] ? parts[verifyIndex + 1] : null;
+        const verificationIdFromQuery = url.searchParams.get('verificationId');
+
+        if (programIdFromPath || verificationIdFromQuery) {
+            return {
+                programId: programIdFromPath || null,
+                verificationId: verificationIdFromQuery || null,
+                baseOrigin: url.origin
+            };
+        }
+    } catch (err) {
+        // Not a URL, fallback to raw program or verification ID
+    }
+
+    return { programId: trimmed };
+}
+
+function applyProgramOverride(countryConfig, override) {
+    if (!override) return countryConfig;
+
+    const baseOrigin = override.baseOrigin || new URL(countryConfig.sheeridUrl).origin;
+    const programId = override.programId || countryConfig.programId;
+    const finalLinkFormat = `${baseOrigin}/verify/${programId}/?verificationId={verificationId}`;
+
+    return {
+        ...countryConfig,
+        programId,
+        verificationId: override.verificationId || countryConfig.verificationId || null,
+        sheeridUrl: `${baseOrigin}/verify/${programId}/?country=${countryConfig.code}&locale=${countryConfig.locale}`,
+        submitEndpoint: `${baseOrigin}/rest/v2/verification/program/${programId}/step/collectStudentPersonalInfo`,
+        uploadEndpoint: `${baseOrigin}/rest/v2/verification/{verificationId}/step/docUpload`,
+        statusEndpoint: `${baseOrigin}/rest/v2/verification/{verificationId}`,
+        redirectEndpoint: `${baseOrigin}/rest/v2/verification/{verificationId}/redirect`,
+        ssoStartEndpoint: `${baseOrigin}/rest/v2/verification/{verificationId}/step/sso`,
+        ssoCancelEndpoint: `${baseOrigin}/rest/v2/verification/{verificationId}/step/sso`,
+        finalLinkFormat
+    };
+}
+
+async function askCustomProgram(countryConfig) {
+    const defaultOrigin = new URL(countryConfig.sheeridUrl).origin;
+    const prompt = `\n🔗 Enter a custom SheerID verification link or program ID for ${countryConfig.name}\n` +
+        `   Press Enter to keep default (${countryConfig.programId} @ ${defaultOrigin}): `;
+
+    const answer = await askQuestion(chalk.blue(prompt));
+    const override = parseProgramInput(answer);
+
+    if (!override) return null;
+
+    const resolvedProgramId = override.programId || countryConfig.programId;
+    console.log(chalk.green(`\n✅ Using program ID: ${resolvedProgramId}`));
+    if (override.baseOrigin) {
+        console.log(chalk.green(`✅ Using custom SheerID host: ${override.baseOrigin}`));
+    }
+    if (override.verificationId) {
+        console.log(chalk.green(`✅ Using provided verification ID: ${override.verificationId}`));
+    }
+
+    return override;
 }
 
 // PROGRAM ID OVERRIDE HELPERS
@@ -2196,8 +2265,15 @@ async function main() {
             return;
         }
         
-        // ASK TARGET LINKS
-        const targetLinks = await askTargetLinks(studentsWithExactMatches.length);
+        // ASK TARGET LINKS (OR FORCE SINGLE LINK WHEN A VERIFICATION URL IS PROVIDED)
+        let targetLinks;
+        if (countryConfig.verificationId) {
+            targetLinks = 1;
+            console.log(chalk.yellow('\n🔗 Custom verification link detected; limiting target to 1 link.'));
+        } else {
+            targetLinks = await askTargetLinks(studentsWithExactMatches.length);
+        }
+
         CONFIG.targetLinks = targetLinks;
         
         console.log(chalk.cyan(`\n🚀 Starting multi-country processing with target: ${targetLinks} links\n`));
