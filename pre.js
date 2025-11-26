@@ -7,6 +7,12 @@ const { wrapper } = require('axios-cookiejar-support');
 const chalk = require('chalk');
 const readline = require('readline');
 
+// DEFAULT SHEERID OVERRIDES (GEMINI CAMPAIGN)
+const DEFAULT_PROGRAM_OVERRIDE = {
+    programId: '67c8c14f5f17a83b745e3f82',
+    baseOrigin: 'https://services.sheerid.com'
+};
+
 // CONFIGURATION
 const CONFIG = {
     studentsFile: 'students.txt',
@@ -506,33 +512,42 @@ function parseProgramInput(input) {
         const url = new URL(trimmed);
         const parts = url.pathname.split('/').filter(Boolean);
         const verifyIndex = parts.indexOf('verify');
+        const programIdFromPath = verifyIndex !== -1 && parts[verifyIndex + 1] ? parts[verifyIndex + 1] : null;
+        const verificationIdFromQuery = url.searchParams.get('verificationId');
 
-        if (verifyIndex !== -1 && parts[verifyIndex + 1]) {
-            return { programId: parts[verifyIndex + 1], baseOrigin: url.origin };
+        if (programIdFromPath || verificationIdFromQuery) {
+            return {
+                programId: programIdFromPath || null,
+                verificationId: verificationIdFromQuery || null,
+                baseOrigin: url.origin
+            };
         }
     } catch (err) {
-        // Not a URL, fallback to raw program ID
+        // Not a URL, fallback to raw program or verification ID
     }
 
     return { programId: trimmed };
 }
 
 function applyProgramOverride(countryConfig, override) {
-    if (!override || !override.programId) return countryConfig;
+    if (!override) return countryConfig;
 
     const baseOrigin = override.baseOrigin || new URL(countryConfig.sheeridUrl).origin;
-    const programId = override.programId;
+    const programId = override.programId || countryConfig.programId;
+    const finalLinkFormat = `${baseOrigin}/verify/${programId}/?verificationId={verificationId}`;
 
     return {
         ...countryConfig,
         programId,
+        verificationId: override.verificationId || countryConfig.verificationId || null,
         sheeridUrl: `${baseOrigin}/verify/${programId}/?country=${countryConfig.code}&locale=${countryConfig.locale}`,
         submitEndpoint: `${baseOrigin}/rest/v2/verification/program/${programId}/step/collectStudentPersonalInfo`,
         uploadEndpoint: `${baseOrigin}/rest/v2/verification/{verificationId}/step/docUpload`,
         statusEndpoint: `${baseOrigin}/rest/v2/verification/{verificationId}`,
         redirectEndpoint: `${baseOrigin}/rest/v2/verification/{verificationId}/redirect`,
         ssoStartEndpoint: `${baseOrigin}/rest/v2/verification/{verificationId}/step/sso`,
-        ssoCancelEndpoint: `${baseOrigin}/rest/v2/verification/{verificationId}/step/sso`
+        ssoCancelEndpoint: `${baseOrigin}/rest/v2/verification/{verificationId}/step/sso`,
+        finalLinkFormat
     };
 }
 
@@ -546,9 +561,13 @@ async function askCustomProgram(countryConfig) {
 
     if (!override) return null;
 
-    console.log(chalk.green(`\n✅ Using custom program ID: ${override.programId}`));
+    const resolvedProgramId = override.programId || countryConfig.programId;
+    console.log(chalk.green(`\n✅ Using program ID: ${resolvedProgramId}`));
     if (override.baseOrigin) {
         console.log(chalk.green(`✅ Using custom SheerID host: ${override.baseOrigin}`));
+    }
+    if (override.verificationId) {
+        console.log(chalk.green(`✅ Using provided verification ID: ${override.verificationId}`));
     }
 
     return override;
@@ -1018,7 +1037,7 @@ class VerificationSession {
         this.countryConfig = countryConfig;
         this.cookieJar = new tough.CookieJar();
         this.userAgent = this.getRandomUserAgent();
-        this.verificationId = null;
+        this.verificationId = countryConfig.verificationId || null;
         this.client = this.createClient();
         this.setUserAgent(this.userAgent);
         this.requestCount = 0;
@@ -1124,12 +1143,12 @@ class VerificationSession {
             
             this.requestCount++;
             
-            if (response.data?.verificationId) {
+            if (!this.verificationId && response.data?.verificationId) {
                 this.verificationId = response.data.verificationId;
                 this.currentStep = response.data.currentStep || 'collectStudentPersonalInfo';
             } else {
-                this.verificationId = this.generateVerificationId();
-                this.currentStep = 'collectStudentPersonalInfo';
+                this.verificationId = this.verificationId || this.generateVerificationId();
+                this.currentStep = response.data?.currentStep || 'collectStudentPersonalInfo';
             }
             
             console.log(`[${this.id}] 🔑 [${this.countryConfig.flag}] Verification ID: ${this.verificationId}`);
@@ -2122,7 +2141,10 @@ async function main() {
     try {
         // SELECT COUNTRY
         const selectedCountryCode = await selectCountry();
-        const defaultCountryConfig = { ...COUNTRIES[selectedCountryCode] };
+        const defaultCountryConfig = applyProgramOverride(
+            { ...COUNTRIES[selectedCountryCode] },
+            DEFAULT_PROGRAM_OVERRIDE
+        );
         const programOverride = await askCustomProgram(defaultCountryConfig);
         const countryConfig = applyProgramOverride(defaultCountryConfig, programOverride);
 
@@ -2131,6 +2153,9 @@ async function main() {
         
         console.log(chalk.green(`\n✅ Selected Country: ${countryConfig.flag} ${countryConfig.name} (${countryConfig.code.toUpperCase()})`));
         console.log(chalk.blue(`🆔 Program ID: ${countryConfig.programId}`));
+        if (countryConfig.verificationId) {
+            console.log(chalk.blue(`🔑 Starting with verification ID: ${countryConfig.verificationId}`));
+        }
         console.log(chalk.blue(`📚 Using colleges file: ${countryConfig.collegesFile}`));
         console.log(chalk.red(`⛔ LEGIT ONLY: Only exact JSON matches will be processed`));
         console.log(chalk.blue(`🔐 SSO SUPPORT: Automatic SSO cancellation & document upload`));
