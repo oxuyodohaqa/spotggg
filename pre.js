@@ -10,7 +10,6 @@ const readline = require('readline');
 // DEFAULT SHEERID OVERRIDES (GEMINI CAMPAIGN)
 const DEFAULT_PROGRAM_OVERRIDE = {
     programId: '67c8c14f5f17a83b745e3f82',
-    verificationId: '692739de9447a3398d136c45',
     baseOrigin: 'https://services.sheerid.com'
 };
 
