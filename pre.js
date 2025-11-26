@@ -496,6 +496,64 @@ function askQuestion(query) {
     });
 }
 
+// PROGRAM ID OVERRIDE HELPERS
+function parseProgramInput(input) {
+    if (!input || !input.trim()) return null;
+
+    const trimmed = input.trim();
+
+    try {
+        const url = new URL(trimmed);
+        const parts = url.pathname.split('/').filter(Boolean);
+        const verifyIndex = parts.indexOf('verify');
+
+        if (verifyIndex !== -1 && parts[verifyIndex + 1]) {
+            return { programId: parts[verifyIndex + 1], baseOrigin: url.origin };
+        }
+    } catch (err) {
+        // Not a URL, fallback to raw program ID
+    }
+
+    return { programId: trimmed };
+}
+
+function applyProgramOverride(countryConfig, override) {
+    if (!override || !override.programId) return countryConfig;
+
+    const baseOrigin = override.baseOrigin || new URL(countryConfig.sheeridUrl).origin;
+    const programId = override.programId;
+
+    return {
+        ...countryConfig,
+        programId,
+        sheeridUrl: `${baseOrigin}/verify/${programId}/?country=${countryConfig.code}&locale=${countryConfig.locale}`,
+        submitEndpoint: `${baseOrigin}/rest/v2/verification/program/${programId}/step/collectStudentPersonalInfo`,
+        uploadEndpoint: `${baseOrigin}/rest/v2/verification/{verificationId}/step/docUpload`,
+        statusEndpoint: `${baseOrigin}/rest/v2/verification/{verificationId}`,
+        redirectEndpoint: `${baseOrigin}/rest/v2/verification/{verificationId}/redirect`,
+        ssoStartEndpoint: `${baseOrigin}/rest/v2/verification/{verificationId}/step/sso`,
+        ssoCancelEndpoint: `${baseOrigin}/rest/v2/verification/{verificationId}/step/sso`
+    };
+}
+
+async function askCustomProgram(countryConfig) {
+    const defaultOrigin = new URL(countryConfig.sheeridUrl).origin;
+    const prompt = `\n🔗 Enter a custom SheerID verification link or program ID for ${countryConfig.name}\n` +
+        `   Press Enter to keep default (${countryConfig.programId} @ ${defaultOrigin}): `;
+
+    const answer = await askQuestion(chalk.blue(prompt));
+    const override = parseProgramInput(answer);
+
+    if (!override) return null;
+
+    console.log(chalk.green(`\n✅ Using custom program ID: ${override.programId}`));
+    if (override.baseOrigin) {
+        console.log(chalk.green(`✅ Using custom SheerID host: ${override.baseOrigin}`));
+    }
+
+    return override;
+}
+
 // COUNTRY SELECTOR
 async function selectCountry() {
     console.log(chalk.cyan('\n🌍 SELECT COUNTRY FOR SPOTIFY VERIFICATION:'));
@@ -2058,14 +2116,16 @@ function displayDetailedAnalysis(analysis, countryConfig, matcherStats) {
 async function main() {
     console.clear();
     console.log(chalk.cyan('🎵 Spotify SheerID - MULTI-COUNTRY MODE (24 COUNTRIES)'));
-    console.log(chalk.green('🌍 All countries use the same program ID: 63fd266996552d469aea40e1'));
+    console.log(chalk.green('🌍 Program ID can now be customized per run (link or raw ID)'));
     console.log(chalk.blue('🔐 COMPLETE SSO HANDLING - Automatic SSO cancellation & document upload'));
-    
+
     try {
         // SELECT COUNTRY
         const selectedCountryCode = await selectCountry();
-        const countryConfig = COUNTRIES[selectedCountryCode];
-        
+        const defaultCountryConfig = { ...COUNTRIES[selectedCountryCode] };
+        const programOverride = await askCustomProgram(defaultCountryConfig);
+        const countryConfig = applyProgramOverride(defaultCountryConfig, programOverride);
+
         CONFIG.selectedCountry = selectedCountryCode;
         CONFIG.countryConfig = countryConfig;
         
