@@ -513,6 +513,23 @@ function parseProgramInput(input) {
 
     const trimmed = input.trim();
 
+    // Allow providing a text file that contains the program/verification info
+    if (fs.existsSync(trimmed) && fs.statSync(trimmed).isFile()) {
+        try {
+            const fileContent = fs.readFileSync(trimmed, 'utf8');
+            const firstLine = fileContent
+                .split(/\r?\n/)
+                .map(line => line.trim())
+                .find(line => line.length > 0);
+
+            if (firstLine) {
+                return parseProgramInput(firstLine);
+            }
+        } catch (err) {
+            console.warn(`⚠️  Could not read program override file ${trimmed}:`, err.message);
+        }
+    }
+
     try {
         const url = new URL(trimmed);
         const parts = url.pathname.split('/').filter(Boolean);
@@ -521,10 +538,19 @@ function parseProgramInput(input) {
         const verificationIdFromQuery = url.searchParams.get('verificationId');
 
         if (programIdFromPath || verificationIdFromQuery) {
+            const params = new URLSearchParams(url.searchParams);
+            let finalLinkFormat = null;
+
+            if (verificationIdFromQuery) {
+                params.set('verificationId', '{verificationId}');
+                finalLinkFormat = `${url.origin}${url.pathname}?${params.toString()}`;
+            }
+
             return {
                 programId: programIdFromPath || null,
                 verificationId: verificationIdFromQuery || null,
-                baseOrigin: url.origin
+                baseOrigin: url.origin,
+                finalLinkFormat
             };
         }
     } catch (err) {
@@ -554,7 +580,8 @@ function applyProgramOverride(countryConfig, override) {
     const baseOrigin = override?.baseOrigin || new URL(countryConfig.sheeridUrl).origin;
     const programId = override?.programId || countryConfig.programId;
     const locale = CONFIG.forcedLocale || countryConfig.locale;
-    const finalLinkFormat = `${baseOrigin}/verify/${programId}/?verificationId={verificationId}`;
+    const finalLinkFormat = override?.finalLinkFormat
+        || `${baseOrigin}/verify/${programId}/?verificationId={verificationId}`;
 
     return {
         ...countryConfig,
@@ -1257,7 +1284,9 @@ class VerificationSession {
                     return 'error';
                 }
                 
-                if (this.currentStep === 'collectStudentPersonalInfo' && i >= 4) {
+                const shouldMarkInvalid = !this.countryConfig.verificationId && this.submittedCollegeId;
+
+                if (this.currentStep === 'collectStudentPersonalInfo' && i >= 4 && shouldMarkInvalid) {
                     console.log(`[${this.id}] ❌ [${this.countryConfig.flag}] STUCK at collectStudentPersonalInfo - INVALID COLLEGE ID ${this.submittedCollegeId}`);
                     if (collegeMatcher && this.submittedCollegeId) {
                         collegeMatcher.markCollegeAsInvalid(this.submittedCollegeId);
@@ -1273,10 +1302,11 @@ class VerificationSession {
         
         console.log(`[${this.id}] ⏰ [${this.countryConfig.flag}] TIMEOUT reached - Final step: ${this.currentStep}`);
         
-        if (collegeMatcher && this.submittedCollegeId) {
+        if (!this.countryConfig.verificationId && collegeMatcher && this.submittedCollegeId) {
             collegeMatcher.markCollegeAsInvalid(this.submittedCollegeId);
         }
-        return 'invalid_college';
+
+        return this.currentStep || 'invalid_college';
     }
     
     // ✅ NEW: Cancel SSO Process
@@ -1741,36 +1771,44 @@ async function processStudent(student, sessionId, collegeMatcher, deleteManager,
             return null;
         }
         
-        // STEP 3: Submit personal info with exact college match
-        const dob = generateDOB();
-        const step = await session.submitPersonalInfo(student, dob, college);
-        
-        if (step === 'success') {
-            console.log(`[${sessionId}] 🎉 [${countryConfig.flag}] Instant success!`);
-            const spotifyUrl = await session.getSpotifyUrl();
-            
-            if (spotifyUrl) {
-                const result = { student, url: spotifyUrl, type: 'instant_exact', college: college.name };
-                saveSpotifyUrl(student, spotifyUrl, session.verificationId, countryConfig, session.getUploadStats());
-                deleteManager.markStudentSuccess(student.studentId);
-                collegeMatcher.addSuccess();
-                statsTracker.recordSuccess(result);
-                statsTracker.recordCollegeAttempt(college.id, college.name, true);
-                return result;
+        let stepResult;
+
+        if (session.verificationId) {
+            console.log(`[${sessionId}] 🔗 [${countryConfig.flag}] Existing verification detected - skipping form submission`);
+            session.submittedCollegeId = college.id;
+            stepResult = await session.waitForCorrectStep(6, collegeMatcher, statsTracker);
+        } else {
+            // STEP 3: Submit personal info with exact college match
+            const dob = generateDOB();
+            const step = await session.submitPersonalInfo(student, dob, college);
+
+            if (step === 'success') {
+                console.log(`[${sessionId}] 🎉 [${countryConfig.flag}] Instant success!`);
+                const spotifyUrl = await session.getSpotifyUrl();
+
+                if (spotifyUrl) {
+                    const result = { student, url: spotifyUrl, type: 'instant_exact', college: college.name };
+                    saveSpotifyUrl(student, spotifyUrl, session.verificationId, countryConfig, session.getUploadStats());
+                    deleteManager.markStudentSuccess(student.studentId);
+                    collegeMatcher.addSuccess();
+                    statsTracker.recordSuccess(result);
+                    statsTracker.recordCollegeAttempt(college.id, college.name, true);
+                    return result;
+                }
             }
+
+            if (step === 'error') {
+                console.log(`[${sessionId}] ❌ [${countryConfig.flag}] Form submission failed`);
+                deleteManager.markStudentFailed(student.studentId);
+                collegeMatcher.addFailure();
+                statsTracker.recordFailureReason('formFailed');
+                statsTracker.recordCollegeAttempt(college.id, college.name, false);
+                return null;
+            }
+
+            // STEP 4: Wait for step progression with SSO handling
+            stepResult = await session.waitForCorrectStep(6, collegeMatcher, statsTracker);
         }
-        
-        if (step === 'error') {
-            console.log(`[${sessionId}] ❌ [${countryConfig.flag}] Form submission failed`);
-            deleteManager.markStudentFailed(student.studentId);
-            collegeMatcher.addFailure();
-            statsTracker.recordFailureReason('formFailed');
-            statsTracker.recordCollegeAttempt(college.id, college.name, false);
-            return null;
-        }
-        
-        // STEP 4: Wait for step progression with SSO handling
-        const stepResult = await session.waitForCorrectStep(6, collegeMatcher, statsTracker);
         
         if (stepResult === 'success') {
             console.log(`[${sessionId}] 🎉 [${countryConfig.flag}] Already success!`);
