@@ -8,8 +8,12 @@ const chalk = require('chalk');
 const readline = require('readline');
 
 // DEFAULT SHEERID OVERRIDES
-// (Leave null so overrides only apply when the user provides a link/ID)
-const DEFAULT_PROGRAM_OVERRIDE = null;
+// (Set to provided SheerID verification so runs start with the supplied IDs)
+const DEFAULT_PROGRAM_OVERRIDE = {
+    programId: '67c8c14f5f17a83b745e3f82',
+    verificationId: '6928774136cf1a52cc59895a',
+    baseOrigin: 'https://services.sheerid.com'
+};
 
 // CONFIGURATION
 const CONFIG = {
@@ -527,6 +531,22 @@ function parseProgramInput(input) {
         // Not a URL, fallback to raw program or verification ID
     }
 
+    // Allow simple "programId,verificationId" or "programId verificationId" input
+    const parts = trimmed.split(/[,\s]+/).filter(Boolean);
+    if (parts.length === 2) {
+        return { programId: parts[0], verificationId: parts[1] };
+    }
+
+    // Handle SheerID TUITION-style verification tokens (e.g., TUITION_46638782_4379044)
+    if (trimmed.startsWith('TUITION_')) {
+        return { verificationId: trimmed };
+    }
+
+    // Handle SheerID SCHEDULE-style verification tokens (e.g., SCHEDULE_46638782_4379044)
+    if (trimmed.startsWith('SCHEDULE_')) {
+        return { verificationId: trimmed };
+    }
+
     return { programId: trimmed };
 }
 
@@ -542,148 +562,6 @@ function applyProgramOverride(countryConfig, override) {
         locale,
         verificationId: override?.verificationId || countryConfig.verificationId || null,
         sheeridUrl: `${baseOrigin}/verify/${programId}/?country=${countryConfig.code}&locale=${locale}`,
-        submitEndpoint: `${baseOrigin}/rest/v2/verification/program/${programId}/step/collectStudentPersonalInfo`,
-        uploadEndpoint: `${baseOrigin}/rest/v2/verification/{verificationId}/step/docUpload`,
-        statusEndpoint: `${baseOrigin}/rest/v2/verification/{verificationId}`,
-        redirectEndpoint: `${baseOrigin}/rest/v2/verification/{verificationId}/redirect`,
-        ssoStartEndpoint: `${baseOrigin}/rest/v2/verification/{verificationId}/step/sso`,
-        ssoCancelEndpoint: `${baseOrigin}/rest/v2/verification/{verificationId}/step/sso`,
-        finalLinkFormat
-    };
-}
-
-async function askCustomProgram(countryConfig) {
-    const defaultOrigin = new URL(countryConfig.sheeridUrl).origin;
-    const prompt = `\n🔗 Enter a custom SheerID verification link or program ID for ${countryConfig.name}\n` +
-        `   Press Enter to keep default (${countryConfig.programId} @ ${defaultOrigin}): `;
-
-    const answer = await askQuestion(chalk.blue(prompt));
-    const override = parseProgramInput(answer);
-
-    if (!override) return null;
-
-    const resolvedProgramId = override.programId || countryConfig.programId;
-    console.log(chalk.green(`\n✅ Using program ID: ${resolvedProgramId}`));
-    if (override.baseOrigin) {
-        console.log(chalk.green(`✅ Using custom SheerID host: ${override.baseOrigin}`));
-    }
-    if (override.verificationId) {
-        console.log(chalk.green(`✅ Using provided verification ID: ${override.verificationId}`));
-    }
-
-    return override;
-}
-
-// PROGRAM ID OVERRIDE HELPERS
-function parseProgramInput(input) {
-    if (!input || !input.trim()) return null;
-
-    const trimmed = input.trim();
-
-    try {
-        const url = new URL(trimmed);
-        const parts = url.pathname.split('/').filter(Boolean);
-        const verifyIndex = parts.indexOf('verify');
-        const programIdFromPath = verifyIndex !== -1 && parts[verifyIndex + 1] ? parts[verifyIndex + 1] : null;
-        const verificationIdFromQuery = url.searchParams.get('verificationId');
-
-        if (programIdFromPath || verificationIdFromQuery) {
-            return {
-                programId: programIdFromPath || null,
-                verificationId: verificationIdFromQuery || null,
-                baseOrigin: url.origin
-            };
-        }
-    } catch (err) {
-        // Not a URL, fallback to raw program or verification ID
-    }
-
-    return { programId: trimmed };
-}
-
-function applyProgramOverride(countryConfig, override) {
-    if (!override) return countryConfig;
-
-    const baseOrigin = override.baseOrigin || new URL(countryConfig.sheeridUrl).origin;
-    const programId = override.programId || countryConfig.programId;
-    const finalLinkFormat = `${baseOrigin}/verify/${programId}/?verificationId={verificationId}`;
-
-    return {
-        ...countryConfig,
-        programId,
-        verificationId: override.verificationId || countryConfig.verificationId || null,
-        sheeridUrl: `${baseOrigin}/verify/${programId}/?country=${countryConfig.code}&locale=${countryConfig.locale}`,
-        submitEndpoint: `${baseOrigin}/rest/v2/verification/program/${programId}/step/collectStudentPersonalInfo`,
-        uploadEndpoint: `${baseOrigin}/rest/v2/verification/{verificationId}/step/docUpload`,
-        statusEndpoint: `${baseOrigin}/rest/v2/verification/{verificationId}`,
-        redirectEndpoint: `${baseOrigin}/rest/v2/verification/{verificationId}/redirect`,
-        ssoStartEndpoint: `${baseOrigin}/rest/v2/verification/{verificationId}/step/sso`,
-        ssoCancelEndpoint: `${baseOrigin}/rest/v2/verification/{verificationId}/step/sso`,
-        finalLinkFormat
-    };
-}
-
-async function askCustomProgram(countryConfig) {
-    const defaultOrigin = new URL(countryConfig.sheeridUrl).origin;
-    const prompt = `\n🔗 Enter a custom SheerID verification link or program ID for ${countryConfig.name}\n` +
-        `   Press Enter to keep default (${countryConfig.programId} @ ${defaultOrigin}): `;
-
-    const answer = await askQuestion(chalk.blue(prompt));
-    const override = parseProgramInput(answer);
-
-    if (!override) return null;
-
-    const resolvedProgramId = override.programId || countryConfig.programId;
-    console.log(chalk.green(`\n✅ Using program ID: ${resolvedProgramId}`));
-    if (override.baseOrigin) {
-        console.log(chalk.green(`✅ Using custom SheerID host: ${override.baseOrigin}`));
-    }
-    if (override.verificationId) {
-        console.log(chalk.green(`✅ Using provided verification ID: ${override.verificationId}`));
-    }
-
-    return override;
-}
-
-// PROGRAM ID OVERRIDE HELPERS
-function parseProgramInput(input) {
-    if (!input || !input.trim()) return null;
-
-    const trimmed = input.trim();
-
-    try {
-        const url = new URL(trimmed);
-        const parts = url.pathname.split('/').filter(Boolean);
-        const verifyIndex = parts.indexOf('verify');
-        const programIdFromPath = verifyIndex !== -1 && parts[verifyIndex + 1] ? parts[verifyIndex + 1] : null;
-        const verificationIdFromQuery = url.searchParams.get('verificationId');
-
-        if (programIdFromPath || verificationIdFromQuery) {
-            return {
-                programId: programIdFromPath || null,
-                verificationId: verificationIdFromQuery || null,
-                baseOrigin: url.origin
-            };
-        }
-    } catch (err) {
-        // Not a URL, fallback to raw program or verification ID
-    }
-
-    return { programId: trimmed };
-}
-
-function applyProgramOverride(countryConfig, override) {
-    if (!override) return countryConfig;
-
-    const baseOrigin = override.baseOrigin || new URL(countryConfig.sheeridUrl).origin;
-    const programId = override.programId || countryConfig.programId;
-    const finalLinkFormat = `${baseOrigin}/verify/${programId}/?verificationId={verificationId}`;
-
-    return {
-        ...countryConfig,
-        programId,
-        verificationId: override.verificationId || countryConfig.verificationId || null,
-        sheeridUrl: `${baseOrigin}/verify/${programId}/?country=${countryConfig.code}&locale=${countryConfig.locale}`,
         submitEndpoint: `${baseOrigin}/rest/v2/verification/program/${programId}/step/collectStudentPersonalInfo`,
         uploadEndpoint: `${baseOrigin}/rest/v2/verification/{verificationId}/step/docUpload`,
         statusEndpoint: `${baseOrigin}/rest/v2/verification/{verificationId}`,
