@@ -531,6 +531,17 @@ function parseProgramInput(input) {
         // Not a URL, fallback to raw program or verification ID
     }
 
+    // Allow simple "programId,verificationId" or "programId verificationId" input
+    const parts = trimmed.split(/[,\s]+/).filter(Boolean);
+    if (parts.length === 2) {
+        return { programId: parts[0], verificationId: parts[1] };
+    }
+
+    // Handle SheerID TUITION-style verification tokens (e.g., TUITION_46638782_4379044)
+    if (trimmed.startsWith('TUITION_')) {
+        return { verificationId: trimmed };
+    }
+
     return { programId: trimmed };
 }
 
