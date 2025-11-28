@@ -542,6 +542,11 @@ function parseProgramInput(input) {
         return { verificationId: trimmed };
     }
 
+    // Handle SheerID SCHEDULE-style verification tokens (e.g., SCHEDULE_46638782_4379044)
+    if (trimmed.startsWith('SCHEDULE_')) {
+        return { verificationId: trimmed };
+    }
+
     return { programId: trimmed };
 }
 
