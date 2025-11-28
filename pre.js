@@ -538,10 +538,19 @@ function parseProgramInput(input) {
         const verificationIdFromQuery = url.searchParams.get('verificationId');
 
         if (programIdFromPath || verificationIdFromQuery) {
+            const params = new URLSearchParams(url.searchParams);
+            let finalLinkFormat = null;
+
+            if (verificationIdFromQuery) {
+                params.set('verificationId', '{verificationId}');
+                finalLinkFormat = `${url.origin}${url.pathname}?${params.toString()}`;
+            }
+
             return {
                 programId: programIdFromPath || null,
                 verificationId: verificationIdFromQuery || null,
-                baseOrigin: url.origin
+                baseOrigin: url.origin,
+                finalLinkFormat
             };
         }
     } catch (err) {
@@ -571,7 +580,8 @@ function applyProgramOverride(countryConfig, override) {
     const baseOrigin = override?.baseOrigin || new URL(countryConfig.sheeridUrl).origin;
     const programId = override?.programId || countryConfig.programId;
     const locale = CONFIG.forcedLocale || countryConfig.locale;
-    const finalLinkFormat = `${baseOrigin}/verify/${programId}/?verificationId={verificationId}`;
+    const finalLinkFormat = override?.finalLinkFormat
+        || `${baseOrigin}/verify/${programId}/?verificationId={verificationId}`;
 
     return {
         ...countryConfig,
